@@ -43,6 +43,10 @@ fn lex_number(word: []const u8, token: *TokenList, line: usize) !usize {
     const end_idx = blk: {
         var i: usize = 0;
         for (word) |c| {
+            if (i == 1 and (c == 'x' or c == 'b' or c == 'o')) {
+                i += 1;
+                continue;
+            }
             if (c >= '0' and c <= '9') i += 1 else break;
         }
         break :blk i;
