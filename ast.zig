@@ -12,7 +12,7 @@ const AST_PROGRAM = struct { function: AST_FUNCTION };
 const AST_FUNCTION = struct { name: []const u8, body: AST_STATEMENT };
 const AST_STATEMENT = struct { name: []const u8, expression: AST_EXPRESSION };
 const AST_EXPRESSION = struct { number: usize };
-const AST = struct {
+pub const AST = struct {
     program: AST_PROGRAM,
     tokenlist: lexer.TokenList,
     var line: usize = 0;
@@ -83,7 +83,7 @@ const AST = struct {
     }
 
     // Pretty Print AST
-    fn pp(self: AST) void {
+    pub fn pp(self: AST) void {
         print(
             \\FUN int {s}:
             \\  params: ()
@@ -95,7 +95,7 @@ const AST = struct {
 };
 
 // Parse tokens to generate AST
-fn parse(tokens: []lexer.Token) !AST {
+pub fn parse(tokens: []lexer.Token) !AST {
     var tokenlist = try lexer.TokenList.initCapacity(allocator, tokens.len);
     std.mem.reverse(lexer.Token, tokens);
     tokenlist.insertSlice(0, tokens) catch unreachable;
