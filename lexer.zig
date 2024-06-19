@@ -29,6 +29,7 @@ pub const TokenList = std.ArrayList(Token);
 
 const Keywords = &[_][]const u8{ "int", "return" };
 
+// Check if value is reserved keyword
 fn isKeyword(value: []const u8) bool {
     for (Keywords) |elem| {
         if (std.mem.eql(u8, elem, value)) {
@@ -38,7 +39,7 @@ fn isKeyword(value: []const u8) bool {
     return false;
 }
 
-/// Lex source code into tokens
+/// Parse a number (10, 0xA, 0b1010, 0o12)
 fn lex_number(word: []const u8, token: *TokenList, line: usize) !usize {
     const end_idx = blk: {
         var i: usize = 0;
@@ -69,6 +70,7 @@ fn lex_lr(char: u8, token: *TokenList, line: usize) !bool {
     return true;
 }
 
+// main parser loop
 pub fn lex(data: []const u8) ![]Token {
     var token = std.ArrayList(Token).init(allocator);
     var line_iterator = std.mem.tokenizeScalar(u8, data, '\n');
@@ -100,7 +102,7 @@ pub fn lex(data: []const u8) ![]Token {
                     continue;
                 }
 
-                // if identifier
+                // if identifier (can parse number/keyword/... if they are attached (ex: main(){return}))
                 var beg: usize = 0;
                 var end: usize = 0;
                 while (end != word[idx..].len) {

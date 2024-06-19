@@ -18,6 +18,7 @@ pub const AST = struct {
     tokenlist: lexer.TokenList,
     var line: usize = 0;
 
+    // <program> ::= <function>
     fn parseProgram(self: *AST) !void {
         const function = try self.parseFunction();
         // TODO: figure out how many functions
@@ -26,6 +27,7 @@ pub const AST = struct {
         self.program = .{ .function = functions };
     }
 
+    // <function> ::= "int" <id> "(" ")" "{" <statement> "}"
     fn parseFunction(self: *AST) !AST_FUNCTION {
         var tok = self.tokenlist.popOrNull() orelse fail(null, error.MissingToken);
         if (tok.kind != .keyword or !std.mem.eql(u8, tok.str.?, "int")) fail(tok, error.ExpectedInt);
@@ -59,6 +61,7 @@ pub const AST = struct {
         return AST_FUNCTION{ .name = fnname, .body = statements };
     }
 
+    // <statement> ::= "return" <exp> ";"
     fn parseStatement(self: *AST) !AST_STATEMENT {
         var tok = self.tokenlist.popOrNull() orelse fail(null, error.MissingToken);
         if (tok.kind != .keyword or !std.mem.eql(u8, tok.str.?, "return")) return fail(tok, error.ExpectedReturn);
@@ -73,12 +76,14 @@ pub const AST = struct {
         return AST_STATEMENT{ .expression = expression, .kind = .@"return" };
     }
 
+    // <exp> ::= <int>
     fn parseExpression(self: *AST) !AST_EXPRESSION {
         const tok = self.tokenlist.popOrNull() orelse fail(null, error.MissingToken);
         if (tok.kind != .number) fail(tok, error.ExpectedNumber);
         return AST_EXPRESSION{ .number = tok.num.? };
     }
 
+    // show an error code with the line number in the code
     fn fail(token: ?lexer.Token, err: anyerror) noreturn {
         if (token) |tok| {
             print("error on line {d}: {s} but got {s}\n", .{ tok.line, @errorName(err), @tagName(tok.kind) });
