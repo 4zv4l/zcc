@@ -5,15 +5,26 @@ const print = std.debug.print;
 const allocator = std.heap.page_allocator;
 
 /// Generate asm code from AST
-/// TODO: rewrite to be more generic function
 fn generate(a: ast.AST, writer: anytype) !void {
-    try writer.print(
-        \\.globl _{0s}
-        \\_{0s}:
-        \\  mov w0, #{1d}
-        \\  ret
-        \\
-    , .{ a.program.function.name, a.program.function.body.expression.number });
+    for (a.program.function) |function| {
+        try writer.print(
+            \\.globl _{0s}
+            \\_{0s}:
+            \\
+        , .{function.name});
+
+        for (function.body) |statement| {
+            switch (statement.kind) {
+                .@"return" => {
+                    try writer.print(
+                        \\  mov w0, #{0d}
+                        \\  ret
+                        \\
+                    , .{statement.expression.number});
+                },
+            }
+        }
+    }
 }
 
 pub fn main() !void {

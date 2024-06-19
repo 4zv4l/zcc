@@ -8,9 +8,10 @@ const allocator = std.heap.page_allocator;
 // <function> ::= "int" <id> "(" ")" "{" <statement> "}"
 // <statement> ::= "return" <exp> ";"
 // <exp> ::= <int>
-const AST_PROGRAM = struct { function: AST_FUNCTION };
-const AST_FUNCTION = struct { name: []const u8, body: AST_STATEMENT };
-const AST_STATEMENT = struct { name: []const u8, expression: AST_EXPRESSION };
+const STATEMENT = enum { @"return" };
+const AST_PROGRAM = struct { function: []AST_FUNCTION };
+const AST_FUNCTION = struct { name: []const u8, body: []AST_STATEMENT };
+const AST_STATEMENT = struct { kind: STATEMENT, expression: AST_EXPRESSION };
 const AST_EXPRESSION = struct { number: usize };
 pub const AST = struct {
     program: AST_PROGRAM,
@@ -19,7 +20,10 @@ pub const AST = struct {
 
     fn parseProgram(self: *AST) !void {
         const function = try self.parseFunction();
-        self.program = .{ .function = function };
+        // TODO: figure out how many functions
+        var functions = try allocator.alloc(AST_FUNCTION, 1);
+        functions[0] = function;
+        self.program = .{ .function = functions };
     }
 
     fn parseFunction(self: *AST) !AST_FUNCTION {
@@ -49,13 +53,15 @@ pub const AST = struct {
         if (tok.kind != .rcbra) fail(tok, error.ExpectedRightCurlyBrace);
         line = tok.line;
 
-        return AST_FUNCTION{ .name = fnname, .body = statement };
+        // TODO: figure out how many statement per function
+        var statements = try allocator.alloc(AST_STATEMENT, 1);
+        statements[0] = statement;
+        return AST_FUNCTION{ .name = fnname, .body = statements };
     }
 
     fn parseStatement(self: *AST) !AST_STATEMENT {
         var tok = self.tokenlist.popOrNull() orelse fail(null, error.MissingToken);
         if (tok.kind != .keyword or !std.mem.eql(u8, tok.str.?, "return")) return fail(tok, error.ExpectedReturn);
-        const statname = try allocator.dupe(u8, tok.str.?);
         line = tok.line;
 
         const expression = try self.parseExpression();
@@ -64,7 +70,7 @@ pub const AST = struct {
         if (tok.kind != .semicolon) fail(tok, error.ExpectedSemicolon);
         line = tok.line;
 
-        return AST_STATEMENT{ .expression = expression, .name = statname };
+        return AST_STATEMENT{ .expression = expression, .kind = .@"return" };
     }
 
     fn parseExpression(self: *AST) !AST_EXPRESSION {
@@ -84,13 +90,25 @@ pub const AST = struct {
 
     // Pretty Print AST
     pub fn pp(self: AST) void {
-        print(
-            \\FUN int {s}:
-            \\  params: ()
-            \\  body:
-            \\      {s} Int<{d}>
-            \\
-        , .{ self.program.function.name, self.program.function.body.name, self.program.function.body.expression.number });
+        for (self.program.function) |function| {
+            print(
+                \\FUNC int {s}:
+                \\  params: ()
+                \\  body:
+                \\
+            , .{function.name});
+
+            for (function.body) |statement| {
+                switch (statement.kind) {
+                    .@"return" => {
+                        print(
+                            \\      {s} {d}
+                            \\
+                        , .{ @tagName(statement.kind), statement.expression.number });
+                    },
+                }
+            }
+        }
     }
 };
 
