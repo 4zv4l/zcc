@@ -30,12 +30,12 @@ pub const AST = struct {
     // <function> ::= "int" <id> "(" ")" "{" <statement> "}"
     fn parseFunction(self: *AST) !AST_FUNCTION {
         var tok = self.tokenlist.popOrNull() orelse fail(null, error.MissingToken);
-        if (tok.kind != .keyword or !std.mem.eql(u8, tok.str.?, "int")) fail(tok, error.ExpectedInt);
+        if (tok.kind != .keyword or !std.mem.eql(u8, tok.kind.keyword, "int")) fail(tok, error.ExpectedInt);
         line = tok.line;
 
         tok = self.tokenlist.popOrNull() orelse fail(null, error.MissingToken);
-        if (tok.kind != .identifier or !std.mem.eql(u8, tok.str.?, "main")) fail(tok, error.ExpectedMain);
-        const fnname = try allocator.dupe(u8, tok.str.?);
+        if (tok.kind != .identifier or !std.mem.eql(u8, tok.kind.identifier, "main")) fail(tok, error.ExpectedMain);
+        const fnname = try allocator.dupe(u8, tok.kind.identifier);
         line = tok.line;
 
         tok = self.tokenlist.popOrNull() orelse fail(null, error.MissingToken);
@@ -64,7 +64,7 @@ pub const AST = struct {
     // <statement> ::= "return" <exp> ";"
     fn parseStatement(self: *AST) !AST_STATEMENT {
         var tok = self.tokenlist.popOrNull() orelse fail(null, error.MissingToken);
-        if (tok.kind != .keyword or !std.mem.eql(u8, tok.str.?, "return")) return fail(tok, error.ExpectedReturn);
+        if (tok.kind != .keyword or !std.mem.eql(u8, tok.kind.keyword, "return")) return fail(tok, error.ExpectedReturn);
         line = tok.line;
 
         const expression = try self.parseExpression();
@@ -80,7 +80,7 @@ pub const AST = struct {
     fn parseExpression(self: *AST) !AST_EXPRESSION {
         const tok = self.tokenlist.popOrNull() orelse fail(null, error.MissingToken);
         if (tok.kind != .number) fail(tok, error.ExpectedNumber);
-        return AST_EXPRESSION{ .number = tok.num.? };
+        return AST_EXPRESSION{ .number = tok.kind.number };
     }
 
     // show an error code with the line number in the code

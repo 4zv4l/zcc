@@ -20,28 +20,49 @@ const allocator = std.heap.page_allocator;
 // semicolon: ;
 
 pub const Token = struct {
-    str: ?[]const u8 = null,
-    num: ?usize = null,
-    kind: enum { keyword, identifier, lpar, rpar, lcbra, rcbra, number, semicolon },
     line: usize,
+    kind: union(enum) {
+        keyword: []const u8,
+        identifier: []const u8,
+        number: usize,
+        lpar: bool,
+        rpar: bool,
+        lcbra: bool,
+        rcbra: bool,
+        semicolon: bool,
+    },
+
+    /// debug function
+    pub fn pp(tokens: []Token) void {
+        // show tokens
+        for (tokens) |tok| {
+            switch (tok.kind) {
+                .keyword => print("keyword: {s}\n", .{tok.kind.keyword}),
+                .identifier => print("identifier: {s}\n", .{tok.kind.identifier}),
+                .number => print("number: {d}\n", .{tok.kind.number}),
+                else => print("{s}\n", .{@tagName(tok.kind)}),
+            }
+        }
+    }
 };
 pub const TokenList = std.ArrayList(Token);
-
 const Keywords = &[_][]const u8{ "int", "return" };
 
 // Check if value is reserved keyword
-fn isKeyword(value: []const u8) bool {
+fn lexKeywordOrIdentifier(value: []const u8, token: *TokenList, line: usize) !void {
     for (Keywords) |elem| {
-        if (std.mem.eql(u8, elem, value)) {
-            return true;
+        if (std.mem.eql(u8, elem, value)) { // is a keyword
+            try token.append(Token{ .kind = .{ .keyword = try allocator.dupe(u8, value) }, .line = line });
+            return;
         }
     }
-    return false;
+    try token.append(Token{ .kind = .{ .identifier = try allocator.dupe(u8, value) }, .line = line });
 }
 
 /// Parse a number (10, 0xA, 0b1010, 0o12)
+/// TODO: fix hex letter not allowed
 fn lex_number(word: []const u8, token: *TokenList, line: usize) !usize {
-    const end_idx = blk: {
+    const end_idx = blk: { // get index of when number ends
         var i: usize = 0;
         for (word) |c| {
             if (i == 1 and (c == 'x' or c == 'b' or c == 'o')) {
@@ -53,18 +74,18 @@ fn lex_number(word: []const u8, token: *TokenList, line: usize) !usize {
         break :blk i;
     };
     const num: usize = std.fmt.parseUnsigned(usize, word[0..end_idx], 0) catch unreachable;
-    try token.append(Token{ .kind = .number, .num = num, .line = line });
+    try token.append(Token{ .kind = .{ .number = num }, .line = line });
     return end_idx;
 }
 
 // Lex any off {}();
 fn lex_lr(char: u8, token: *TokenList, line: usize) !bool {
     switch (char) {
-        '{' => try token.append(Token{ .kind = .lcbra, .line = line }),
-        '}' => try token.append(Token{ .kind = .rcbra, .line = line }),
-        '(' => try token.append(Token{ .kind = .lpar, .line = line }),
-        ')' => try token.append(Token{ .kind = .rpar, .line = line }),
-        ';' => try token.append(Token{ .kind = .semicolon, .line = line }),
+        '{' => try token.append(Token{ .kind = .{ .lcbra = true }, .line = line }),
+        '}' => try token.append(Token{ .kind = .{ .rcbra = true }, .line = line }),
+        '(' => try token.append(Token{ .kind = .{ .lpar = true }, .line = line }),
+        ')' => try token.append(Token{ .kind = .{ .rpar = true }, .line = line }),
+        ';' => try token.append(Token{ .kind = .{ .semicolon = true }, .line = line }),
         else => return false,
     }
     return true;
@@ -95,14 +116,7 @@ pub fn lex(data: []const u8) ![]Token {
                     continue;
                 }
 
-                // if keyword
-                if (isKeyword(word[idx..])) {
-                    try token.append(Token{ .kind = .keyword, .str = try allocator.dupe(u8, word[idx..]), .line = line_number });
-                    idx += word[idx..].len;
-                    continue;
-                }
-
-                // if identifier (can parse number/keyword/... if they are attached (ex: main(){return}))
+                // if identifier/keyword (can parse number/keyword/... if they are attached (ex: main(){return}))
                 var beg: usize = 0;
                 var end: usize = 0;
                 while (end != word[idx..].len) {
@@ -113,11 +127,7 @@ pub fn lex(data: []const u8) ![]Token {
                     }
                     // if contains {}() and scanned before, add identifier and then {}() to token
                     if (std.mem.containsAtLeast(u8, "{}();", 1, &[_]u8{word[end]}) and (end > beg)) {
-                        if (isKeyword(word[beg..end])) {
-                            try token.append(Token{ .kind = .keyword, .str = try allocator.dupe(u8, word[beg..end]), .line = line_number });
-                        } else {
-                            try token.append(Token{ .kind = .identifier, .str = try allocator.dupe(u8, word[beg..end]), .line = line_number });
-                        }
+                        try lexKeywordOrIdentifier(word[beg..end], &token, line_number);
                         _ = try lex_lr(word[end], &token, line_number);
                         end += 1;
                         beg = end;
@@ -132,28 +142,11 @@ pub fn lex(data: []const u8) ![]Token {
                 }
                 // if reached end of word but have data, add token
                 if (beg < end) {
-                    if (isKeyword(word[beg..end])) {
-                        try token.append(Token{ .kind = .keyword, .str = try allocator.dupe(u8, word[beg..end]), .line = line_number });
-                    } else {
-                        try token.append(Token{ .kind = .identifier, .str = try allocator.dupe(u8, word[beg..end]), .line = line_number });
-                    }
+                    try lexKeywordOrIdentifier(word[beg..end], &token, line_number);
                 }
                 idx += word[idx..].len;
             }
         }
     }
     return try token.toOwnedSlice();
-}
-
-// debug function
-pub fn pp(tokens: []Token) void {
-    // show tokens
-    for (tokens) |tok| {
-        switch (tok.kind) {
-            .keyword => print("keyword: {s}\n", .{tok.str.?}),
-            .identifier => print("identifier: {s}\n", .{tok.str.?}),
-            .number => print("number: {d}\n", .{tok.num.?}),
-            else => print("{s}\n", .{@tagName(tok.kind)}),
-        }
-    }
 }

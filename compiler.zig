@@ -41,10 +41,10 @@ pub fn main() !void {
 
     // parse tokens from source file
     const tokens = try lexer.lex(source);
+    lexer.Token.pp(tokens);
 
     // generate Abstract Syntax Tree
     const abstract_tree = try ast.parse(tokens);
-    abstract_tree.pp();
 
     // generate assembly file
     var outfile = try std.fs.cwd().createFile("out.s", .{});
