@@ -4,29 +4,16 @@ const print = std.debug.print;
 const allocator = std.heap.page_allocator;
 const AST = @This();
 
-// Grammar:
-// <program> ::= <function>
-// <function> ::= "int" <id> "(" ")" "{" <statement> "}"
-// <statement> ::= "return" <exp> ";"
-// <exp> ::= <int>
-const TYPE = enum { int, char, cstring };
-const AST_PROGRAM = struct { function: []AST_FUNCTION };
-const AST_FUNCTION = struct { type: TYPE = .int, name: []const u8, body: []AST_STATEMENT };
-const AST_STATEMENT = union(enum) {
-    @"return": struct { rc: usize },
-    call: struct { fname: []const u8, args: *anyopaque },
-};
-const AST_EXPRESSION = union(TYPE) {
-    int: usize,
-    char: u8,
-    cstring: [*:0]u8,
-};
-
 program: AST_PROGRAM,
 tokenlist: Token.TokenList,
 var line: usize = 0; // contains last parsed line
 
+const TYPE = enum { int, char, cstring };
+
 // <program> ::= <function>
+const AST_PROGRAM = struct {
+    function: []AST_FUNCTION,
+};
 fn parseProgram(self: *AST) !void {
     const function = try self.parseFunction();
     // TODO: figure out how many functions
@@ -36,6 +23,11 @@ fn parseProgram(self: *AST) !void {
 }
 
 // <function> ::= "int" <id> "(" ")" "{" <statement> "}"
+const AST_FUNCTION = struct {
+    type: TYPE = .int,
+    name: []const u8,
+    body: []AST_STATEMENT,
+};
 fn parseFunction(self: *AST) !AST_FUNCTION {
     _ = try self.parseExpect(.keyword, "int");
 
@@ -56,6 +48,10 @@ fn parseFunction(self: *AST) !AST_FUNCTION {
 }
 
 // <statement> ::= "return" <exp> ";"
+const AST_STATEMENT = union(enum) {
+    @"return": struct { rc: usize },
+    call: struct { fname: []const u8, args: *anyopaque },
+};
 fn parseStatement(self: *AST) !AST_STATEMENT {
     _ = try self.parseExpect(.keyword, @tagName(AST_STATEMENT.@"return"));
     const expression = try self.parseExpression();
@@ -64,6 +60,11 @@ fn parseStatement(self: *AST) !AST_STATEMENT {
 }
 
 // <exp> ::= <int>
+const AST_EXPRESSION = union(TYPE) {
+    int: usize,
+    char: u8,
+    cstring: [*:0]u8,
+};
 fn parseExpression(self: *AST) !AST_EXPRESSION {
     const tok = try self.parseExpect(.number, null);
     return AST_EXPRESSION{ .int = tok.kind.number };
