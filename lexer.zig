@@ -1,14 +1,21 @@
 const std = @import("std");
 const print = std.debug.print;
 const allocator = std.heap.page_allocator;
+const Token = @This();
 
-// int main() {
-//  return 0;
-// }
-// ------------
-// _main:
-//  mov $0, %rax
-//  ret
+pub const TokenList = std.ArrayList(Token);
+// TODO: add support for string literal
+pub const TokenKind = enum {
+    keyword,
+    identifier,
+    number,
+    lpar,
+    rpar,
+    lcbra,
+    rcbra,
+    semicolon,
+};
+pub const Keywords = &[_][]const u8{ "int", "return" };
 
 // keyword: int | return
 // identifier: [a-zA-Z]
@@ -19,34 +26,30 @@ const allocator = std.heap.page_allocator;
 // number: [0-9]
 // semicolon: ;
 
-pub const Token = struct {
-    line: usize,
-    kind: union(enum) {
-        keyword: []const u8,
-        identifier: []const u8,
-        number: usize,
-        lpar: bool,
-        rpar: bool,
-        lcbra: bool,
-        rcbra: bool,
-        semicolon: bool,
-    },
+line: usize,
+kind: union(TokenKind) {
+    keyword: []const u8,
+    identifier: []const u8,
+    number: usize,
+    lpar: bool,
+    rpar: bool,
+    lcbra: bool,
+    rcbra: bool,
+    semicolon: bool,
+},
 
-    /// debug function
-    pub fn pp(tokens: []Token) void {
-        // show tokens
-        for (tokens) |tok| {
-            switch (tok.kind) {
-                .keyword => print("keyword: {s}\n", .{tok.kind.keyword}),
-                .identifier => print("identifier: {s}\n", .{tok.kind.identifier}),
-                .number => print("number: {d}\n", .{tok.kind.number}),
-                else => print("{s}\n", .{@tagName(tok.kind)}),
-            }
+/// debug function
+pub fn dprint(tokens: []Token) void {
+    // show tokens
+    for (tokens) |tok| {
+        switch (tok.kind) {
+            .keyword => print("keyword: {s}\n", .{tok.kind.keyword}),
+            .identifier => print("identifier: {s}\n", .{tok.kind.identifier}),
+            .number => print("number: {d}\n", .{tok.kind.number}),
+            else => print("{s}\n", .{@tagName(tok.kind)}),
         }
     }
-};
-pub const TokenList = std.ArrayList(Token);
-const Keywords = &[_][]const u8{ "int", "return" };
+}
 
 // Check if value is reserved keyword
 fn lexKeywordOrIdentifier(value: []const u8, token: *TokenList, line: usize) !void {
